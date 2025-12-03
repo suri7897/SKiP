@@ -101,7 +101,7 @@ def inject_noise(X_train, y_train, feature_noise=0.0, label_noise=0.0, random_st
             z = rng.standard_normal(size=d)
 
             mah_distance = np.dot(z, z)
-            E = rng.exponential(scale=tau / 2.0)
+            E = rng.exponential(scale= 2 / tau)
             r2 = tau + E
 
             scale = np.sqrt(r2 / (mah_distance + 1e-12))
