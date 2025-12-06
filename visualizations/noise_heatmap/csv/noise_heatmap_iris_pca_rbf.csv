@@ -1,0 +1,34 @@
+Model,Label_Noise,Feature_Noise_Clean,Feature_Noise_10%,Feature_Noise_20%
+NaiveSVM,0%,90.0,87.9,83.3
+NaiveSVM,10%,86.7,87.9,77.8
+NaiveSVM,20%,70.0,66.7,72.2
+ProbSVM,0%,93.3,84.8,83.3
+ProbSVM,10%,86.7,81.8,77.8
+ProbSVM,20%,70.0,66.7,72.2
+KNNSVM,0%,93.3,87.9,88.9
+KNNSVM,10%,86.7,87.9,80.6
+KNNSVM,20%,70.0,66.7,69.4
+SKiP-multiply,0%,93.3,84.8,86.1
+SKiP-multiply,10%,86.7,87.9,80.6
+SKiP-multiply,20%,70.0,66.7,69.4
+SKiP-minmax-multiply,0%,93.3,87.9,86.1
+SKiP-minmax-multiply,10%,86.7,87.9,80.6
+SKiP-minmax-multiply,20%,70.0,66.7,69.4
+SKiP-average,0%,93.3,84.8,86.1
+SKiP-average,10%,86.7,84.8,80.6
+SKiP-average,20%,70.0,66.7,69.4
+SKiP-minmax-average,0%,93.3,84.8,86.1
+SKiP-minmax-average,10%,86.7,87.9,80.6
+SKiP-minmax-average,20%,70.0,66.7,69.4
+KNN,0%,96.7,84.8,83.3
+KNN,10%,83.3,81.8,80.6
+KNN,20%,66.7,66.7,69.4
+Decision Tree (gini),0%,86.7,81.8,88.9
+Decision Tree (gini),10%,86.7,84.8,83.3
+Decision Tree (gini),20%,70.0,75.8,72.2
+Decision Tree (entropy),0%,86.7,81.8,91.7
+Decision Tree (entropy),10%,86.7,81.8,77.8
+Decision Tree (entropy),20%,70.0,66.7,69.4
+Logistic Regression,0%,93.3,81.8,88.9
+Logistic Regression,10%,86.7,81.8,83.3
+Logistic Regression,20%,66.7,66.7,75.0
