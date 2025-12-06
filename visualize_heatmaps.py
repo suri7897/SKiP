@@ -129,8 +129,9 @@ for dataset_name in ['breast_cancer', 'breast_cancer_pca', 'iris', 'iris_pca', '
             for i in range(len(label_order)):
                 for j in range(len(feature_order)):
                     if not np.isnan(pivot.values[i, j]):
-                        text = ax.text(j, i, f'{pivot.values[i, j]:.3f}',
-                                     ha='center', va='center', color='black', fontsize=7)
+                        value = pivot.values[i, j]
+                        text = ax.text(j, i, f'{value*100:.1f}%',
+                                     ha='center', va='center', color='black', fontsize=15)
 
             # Modify title for display
             display_model = model

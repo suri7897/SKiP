@@ -202,7 +202,9 @@ def run_experiment_and_visualize():
     noise_configs = [
         (None, 0.0, '0%'),      # (feature_noise, label_noise, display_name)
         ('5%', 0.05, '5%'),
-        ('10%', 0.10, '10%')
+        ('10%', 0.10, '10%'),
+        ('15%', 0.15, '15%'),
+        ('20%', 0.20, '20%')
     ]
     
     C_values = [0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0]

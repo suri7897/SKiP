@@ -371,14 +371,14 @@ def visualize_results(df):
         
         axes[idx].set_xlabel('Outlier Level (Feature/Label)', fontsize=11)
         axes[idx].set_ylabel('Number of Support Vectors', fontsize=11)
-        axes[idx].set_title(f'{dataset}', fontsize=12, fontweight='bold')
+        axes[idx].set_title(f'{dataset.replace("_pca", "").upper()}', fontsize=12, fontweight='bold')
         axes[idx].set_xticks(x)
         axes[idx].set_xticklabels(noise_levels, rotation=45, ha='right')
         axes[idx].legend(fontsize=9)
         axes[idx].grid(True, alpha=0.3, axis='y')
     
-    plt.suptitle('Support Vector Count Comparison', 
-                 fontsize=14, fontweight='bold', y=1.02)
+    # plt.suptitle('Support Vector Count Comparison', 
+    #              fontsize=14, fontweight='bold', y=1.02)
     plt.tight_layout()
     
     # Save PNG

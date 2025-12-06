@@ -234,8 +234,15 @@ def generate_type1_noise_with_boundary(
                 
                 save_dataset(
                     X_train, y_train,
-                    all_outliers_X,
-                    all_outliers_y,
+
+                    # 모두 저장
+                    # all_outliers_X,
+                    # all_outliers_y,
+
+                    # Decision Boundary 넘는 것만 저장
+                    crossed_outliers_X,
+                    crossed_outliers_y,
+
                     scaler,
                     ratio,
                     output_dir,

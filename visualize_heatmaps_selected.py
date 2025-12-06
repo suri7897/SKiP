@@ -145,8 +145,9 @@ def create_heatmaps(selected_models):
                 for i in range(len(label_order)):
                     for j in range(len(feature_order)):
                         if not np.isnan(pivot.values[i, j]):
-                            text = ax.text(j, i, f'{pivot.values[i, j]:.3f}',
-                                        ha='center', va='center', color='black', fontsize=8)
+                            value = pivot.values[i, j]
+                            text = ax.text(j, i, f'{value*100:.1f}%',
+                                        ha='center', va='center', color='black', fontsize=15)
 
                 if model == "SKiP-average":
                     display_model = "SKiP"
