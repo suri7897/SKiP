@@ -330,17 +330,18 @@ def save_dataset(
     
     outliers_X_orig = scaler.inverse_transform(outliers_X_scaled_array)
     
-    # 원본 데이터와 노이즈 결합
-    X_combined = np.vstack([X_train_orig, outliers_X_orig])
-    y_combined = np.concatenate([y_train_orig, outliers_y_array])
+    """ 노이즈만 저장하도록 수정 """
+    # # 원본 데이터와 노이즈 결합
+    # X_combined = np.vstack([X_train_orig, outliers_X_orig])
+    # y_combined = np.concatenate([y_train_orig, outliers_y_array])
     
     # 파일 저장 (fast 버전임을 표시)
     output_path = Path(output_dir) / f"fast_{dataset_name}_type1_boundary_{int(ratio*100)}pct.npz"
-    np.savez(output_path, X_train=X_combined, y_train=y_combined)
+    np.savez(output_path, X_train=outliers_X_orig, y_train=outliers_y_array)
     
     print(f"\n✓ 저장 완료: {output_path.name}")
     print(f"  - 원본: {len(X_train_orig)}, 노이즈: {len(outliers_X_orig)}, "
-          f"전체: {len(X_combined)} ({ratio*100:.0f}% 노이즈)")
+          f"{ratio*100:.0f}% 노이즈")
 
 
 def find_dataset_files(base_dir="."):

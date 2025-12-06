@@ -112,19 +112,30 @@ def load_dataset(dataset_name, feature_noise_level=None, label_noise=0.0, random
     Returns:
     - X_train, X_test, y_train, y_test (all scaled)
     """
-    if feature_noise_level is None:
-        file_path = datasets_config[dataset_name]['clean']
-    else:
-        file_path = datasets_config[dataset_name]['noisy'][feature_noise_level]
+    # Load clean data
+    clean_file_path = datasets_config[dataset_name]['clean']
+    clean_data = np.load(clean_file_path)
+    X_clean = clean_data['X_train']
+    y_clean = clean_data['y_train']
 
-    data = np.load(file_path)
-    X = data['X_train']  # The full dataset is stored as X_train
-    y = data['y_train']  # The full labels are stored as y_train
-
-    # Inject label noise if needed
+    # Inject label noise to clean data if needed
     if label_noise > 0:
-        X, y = inject_noise(X, y, feature_noise=0.0, label_noise=label_noise, 
-                           random_state=random_state, add_label_noise=False)
+        X_clean, y_clean = inject_noise(X_clean, y_clean, feature_noise=0.0, label_noise=label_noise, 
+                                        random_state=random_state, add_label_noise=False)
+
+    # If feature noise is specified, load and concatenate feature noise data
+    if feature_noise_level is not None:
+        noise_file_path = datasets_config[dataset_name]['noisy'][feature_noise_level]
+        noise_data = np.load(noise_file_path)
+        X_noise = noise_data['X_train']
+        y_noise = noise_data['y_train']
+        
+        # Concatenate clean data (with label noise) and feature noise data
+        X = np.vstack([X_clean, X_noise])
+        y = np.concatenate([y_clean, y_noise])
+    else:
+        X = X_clean
+        y = y_clean
 
     # Train-test split
     X_train, X_test, y_train, y_test = train_test_split(

@@ -150,6 +150,9 @@ class ProbSVM(NaiveSVM):
         n_samples = len(y)
         p_i = np.zeros(n_samples)
 
+        # Detect one-hot encoded features (binary features with only 0 and 1 values)
+        is_onehot = np.all((X == 0) | (X == 1), axis=0)
+        
         for cls in classes:
             cls_mask = (y == cls)
             prior = np.sum(cls_mask) / n_samples
@@ -158,8 +161,18 @@ class ProbSVM(NaiveSVM):
             mean = np.mean(X_cls, axis=0)
             var = np.var(X_cls, axis=0) + 1e-9
 
-            # likelihood for all samples given this class
-            likelihood = np.prod(self._gaussian_prob(X_cls, mean, var), axis=1)
+            # For one-hot encoded features, use uniform probability (set to 1)
+            # For continuous features, use Gaussian probability
+            likelihood = np.ones((X_cls.shape[0], X_cls.shape[1]))
+            continuous_mask = ~is_onehot
+            if np.any(continuous_mask):
+                likelihood[:, continuous_mask] = self._gaussian_prob(
+                    X_cls[:, continuous_mask], 
+                    mean[continuous_mask], 
+                    var[continuous_mask]
+                )
+            
+            likelihood = np.prod(likelihood, axis=1)
 
             # only use the likelihood corresponding to the true label
             p_i[cls_mask] = prior * likelihood
@@ -394,6 +407,9 @@ class SKiP(NaiveSVM):
         n_samples = len(y)
         p_i = np.zeros(n_samples)
 
+        # Detect one-hot encoded features (binary features with only 0 and 1 values)
+        is_onehot = np.all((X == 0) | (X == 1), axis=0)
+        
         for cls in classes:
             cls_mask = (y == cls)
             prior = np.sum(cls_mask) / n_samples
@@ -402,8 +418,18 @@ class SKiP(NaiveSVM):
             mean = np.mean(X_cls, axis=0)
             var = np.var(X_cls, axis=0) + 1e-9
 
-            # likelihood for all samples given this class
-            likelihood = np.prod(self._gaussian_prob(X_cls, mean, var), axis=1)
+            # For one-hot encoded features, use uniform probability (set to 1)
+            # For continuous features, use Gaussian probability
+            likelihood = np.ones((X_cls.shape[0], X_cls.shape[1]))
+            continuous_mask = ~is_onehot
+            if np.any(continuous_mask):
+                likelihood[:, continuous_mask] = self._gaussian_prob(
+                    X_cls[:, continuous_mask], 
+                    mean[continuous_mask], 
+                    var[continuous_mask]
+                )
+            
+            likelihood = np.prod(likelihood, axis=1)
 
             # only use the likelihood corresponding to the true label
             p_i[cls_mask] = prior * likelihood

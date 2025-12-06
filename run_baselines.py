@@ -1,0 +1,429 @@
+"""
+Baseline Model Comparison Experiments with KNN and Decision Tree
+Runs experiments on 8 datasets with Type I boundary noise and label noise
+"""
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from datasets import inject_noise
+from multiprocessing import Pool, cpu_count, Manager
+import warnings
+warnings.filterwarnings('ignore')
+
+
+# Dataset configurations (same as run_experiments.py)
+datasets_config = {
+    'breast_cancer': {
+        'clean': 'datasets/breast_cancer/breast_cancer.npz',
+        'noisy': {
+            '5%': 'datasets/breast_cancer/fast_breast_cancer_type1_boundary_5pct.npz',
+            '10%': 'datasets/breast_cancer/fast_breast_cancer_type1_boundary_10pct.npz',
+            '15%': 'datasets/breast_cancer/fast_breast_cancer_type1_boundary_15pct.npz',
+            '20%': 'datasets/breast_cancer/fast_breast_cancer_type1_boundary_20pct.npz',
+        }
+    },
+    'breast_cancer_pca': {
+        'clean': 'datasets/breast_cancer_pca/breast_cancer_pca.npz',
+        'noisy': {
+            '5%': 'datasets/breast_cancer_pca/fast_breast_cancer_pca_type1_boundary_5pct.npz',
+            '10%': 'datasets/breast_cancer_pca/fast_breast_cancer_pca_type1_boundary_10pct.npz',
+            '15%': 'datasets/breast_cancer_pca/fast_breast_cancer_pca_type1_boundary_15pct.npz',
+            '20%': 'datasets/breast_cancer_pca/fast_breast_cancer_pca_type1_boundary_20pct.npz',
+        }
+    },
+    'iris': {
+        'clean': 'datasets/iris/iris.npz',
+        'noisy': {
+            '5%': 'datasets/iris/fast_iris_type1_boundary_5pct.npz',
+            '10%': 'datasets/iris/fast_iris_type1_boundary_10pct.npz',
+            '15%': 'datasets/iris/fast_iris_type1_boundary_15pct.npz',
+            '20%': 'datasets/iris/fast_iris_type1_boundary_20pct.npz',
+        }
+    },
+    'iris_pca': {
+        'clean': 'datasets/iris_pca/iris_pca.npz',
+        'noisy': {
+            '5%': 'datasets/iris_pca/fast_iris_pca_type1_boundary_5pct.npz',
+            '10%': 'datasets/iris_pca/fast_iris_pca_type1_boundary_10pct.npz',
+            '15%': 'datasets/iris_pca/fast_iris_pca_type1_boundary_15pct.npz',
+            '20%': 'datasets/iris_pca/fast_iris_pca_type1_boundary_20pct.npz',
+        }
+    },
+    'titanic': {
+        'clean': 'datasets/titanic/titanic.npz',
+        'noisy': {
+            '5%': 'datasets/titanic/fast_titanic_type1_boundary_5pct.npz',
+            '10%': 'datasets/titanic/fast_titanic_type1_boundary_10pct.npz',
+            '15%': 'datasets/titanic/fast_titanic_type1_boundary_15pct.npz',
+            '20%': 'datasets/titanic/fast_titanic_type1_boundary_20pct.npz',
+        }
+    },
+    'titanic_pca': {
+        'clean': 'datasets/titanic_pca/titanic_pca.npz',
+        'noisy': {
+            '5%': 'datasets/titanic_pca/fast_titanic_pca_type1_boundary_5pct.npz',
+            '10%': 'datasets/titanic_pca/fast_titanic_pca_type1_boundary_10pct.npz',
+            '15%': 'datasets/titanic_pca/fast_titanic_pca_type1_boundary_15pct.npz',
+            '20%': 'datasets/titanic_pca/fast_titanic_pca_type1_boundary_20pct.npz',
+        }
+    },
+    'wine': {
+        'clean': 'datasets/wine/wine.npz',
+        'noisy': {
+            '5%': 'datasets/wine/fast_wine_type1_boundary_5pct.npz',
+            '10%': 'datasets/wine/fast_wine_type1_boundary_10pct.npz',
+            '15%': 'datasets/wine/fast_wine_type1_boundary_15pct.npz',
+            '20%': 'datasets/wine/fast_wine_type1_boundary_20pct.npz',
+        }
+    },
+    'wine_pca': {
+        'clean': 'datasets/wine_pca/wine_pca.npz',
+        'noisy': {
+            '5%': 'datasets/wine_pca/fast_wine_pca_type1_boundary_5pct.npz',
+            '10%': 'datasets/wine_pca/fast_wine_pca_type1_boundary_10pct.npz',
+            '15%': 'datasets/wine_pca/fast_wine_pca_type1_boundary_15pct.npz',
+            '20%': 'datasets/wine_pca/fast_wine_pca_type1_boundary_20pct.npz',
+        }
+    }
+}
+
+# Experiment configurations
+k_values = [3, 5, 7, 10, 15, 20]
+max_depth_values = [3, 5, 7, 10, 15, 20, None]
+min_samples_split_values = [2, 5, 10, 20]
+C_values = [0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000]
+max_iter_values = [100, 200, 500, 1000]
+feature_noise_levels = [None, '5%', '10%', '15%', '20%']  # None = clean data
+label_noise_levels = [0.0, 0.05, 0.10, 0.15, 0.20]
+
+
+def load_dataset(dataset_name, feature_noise_level=None, label_noise=0.0, random_state=42):
+    """
+    Load dataset from npz file and inject label noise.
+
+    Parameters:
+    - dataset_name: Name of the dataset
+    - feature_noise_level: None for clean data, or '5%', '10%', '15%', '20%' for pre-generated feature noise
+    - label_noise: Proportion of labels to flip (0.0 to 1.0)
+    - random_state: Random seed for reproducibility
+
+    Returns:
+    - X_train, X_test, y_train, y_test (all scaled)
+    """
+    # Load clean data
+    clean_file_path = datasets_config[dataset_name]['clean']
+    clean_data = np.load(clean_file_path)
+    X_clean = clean_data['X_train']
+    y_clean = clean_data['y_train']
+
+    # Inject label noise to clean data if needed
+    if label_noise > 0:
+        X_clean, y_clean = inject_noise(X_clean, y_clean, feature_noise=0.0, label_noise=label_noise, 
+                                        random_state=random_state, add_label_noise=False)
+
+    # If feature noise is specified, load and concatenate feature noise data
+    if feature_noise_level is not None:
+        noise_file_path = datasets_config[dataset_name]['noisy'][feature_noise_level]
+        noise_data = np.load(noise_file_path)
+        X_noise = noise_data['X_train']
+        y_noise = noise_data['y_train']
+        
+        # Concatenate clean data (with label noise) and feature noise data
+        X = np.vstack([X_clean, X_noise])
+        y = np.concatenate([y_clean, y_noise])
+    else:
+        X = X_clean
+        y = y_clean
+
+
+    # Train-test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=random_state
+    )
+
+    # Standardization
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    return X_train_scaled, X_test_scaled, y_train, y_test
+
+
+def run_single_experiment(args):
+    """
+    Run a single experiment with given configuration.
+    Designed to be called by multiprocessing.
+
+    Parameters:
+    - args: Tuple of (dataset_name, feature_noise_level, label_noise, random_state, total, counter, lock)
+
+    Returns:
+    - List of result dictionaries for this configuration
+    """
+    dataset_name, feature_noise_level, label_noise, random_state, total, counter, lock = args
+    
+    feature_noise_str = "Clean" if feature_noise_level is None else feature_noise_level
+    label_noise_str = f"{int(label_noise * 100)}%"
+    
+    # Print start message
+    print(f"Starting: {dataset_name} | Feature: {feature_noise_str} | Label: {label_noise_str}")
+
+    # Load data with feature noise and inject label noise
+    X_train, X_test, y_train, y_test = load_dataset(dataset_name, feature_noise_level, label_noise, random_state)
+
+    results = []
+
+    # Test KNN with different k values
+    for k in k_values:
+        # KNN with uniform weights
+        clf = KNeighborsClassifier(n_neighbors=k, weights='uniform')
+        clf.fit(X_train, y_train)
+        train_acc = clf.score(X_train, y_train)
+        test_acc = clf.score(X_test, y_test)
+        results.append({
+            'Dataset': dataset_name,
+            'Feature_Noise': feature_noise_str,
+            'Label_Noise': label_noise_str,
+            'Model': 'KNN',
+            'k': k,
+            'weights': 'uniform',
+            'max_depth': None,
+            'min_samples_split': None,
+            'C': None,
+            'max_iter': None,
+            'Train Acc': train_acc,
+            'Test Acc': test_acc
+        })
+
+        # KNN with distance weights
+        clf = KNeighborsClassifier(n_neighbors=k, weights='distance')
+        clf.fit(X_train, y_train)
+        train_acc = clf.score(X_train, y_train)
+        test_acc = clf.score(X_test, y_test)
+        results.append({
+            'Dataset': dataset_name,
+            'Feature_Noise': feature_noise_str,
+            'Label_Noise': label_noise_str,
+            'Model': 'KNN',
+            'k': k,
+            'weights': 'distance',
+            'max_depth': None,
+            'min_samples_split': None,
+            'C': None,
+            'max_iter': None,
+            'Train Acc': train_acc,
+            'Test Acc': test_acc
+        })
+
+    # Test Decision Tree with different hyperparameters
+    for max_depth in max_depth_values:
+        for min_samples_split in min_samples_split_values:
+            # Decision Tree with gini criterion
+            clf = DecisionTreeClassifier(
+                max_depth=max_depth,
+                min_samples_split=min_samples_split,
+                criterion='gini',
+                random_state=random_state
+            )
+            clf.fit(X_train, y_train)
+            train_acc = clf.score(X_train, y_train)
+            test_acc = clf.score(X_test, y_test)
+            results.append({
+                'Dataset': dataset_name,
+                'Feature_Noise': feature_noise_str,
+                'Label_Noise': label_noise_str,
+                'Model': 'DecisionTree-gini',
+                'k': None,
+                'weights': None,
+                'max_depth': max_depth,
+                'min_samples_split': min_samples_split,
+                'C': None,
+                'max_iter': None,
+                'Train Acc': train_acc,
+                'Test Acc': test_acc
+            })
+
+            # Decision Tree with entropy criterion
+            clf = DecisionTreeClassifier(
+                max_depth=max_depth,
+                min_samples_split=min_samples_split,
+                criterion='entropy',
+                random_state=random_state
+            )
+            clf.fit(X_train, y_train)
+            train_acc = clf.score(X_train, y_train)
+            test_acc = clf.score(X_test, y_test)
+            results.append({
+                'Dataset': dataset_name,
+                'Feature_Noise': feature_noise_str,
+                'Label_Noise': label_noise_str,
+                'Model': 'DecisionTree-entropy',
+                'k': None,
+                'weights': None,
+                'max_depth': max_depth,
+                'min_samples_split': min_samples_split,
+                'C': None,
+                'max_iter': None,
+                'Train Acc': train_acc,
+                'Test Acc': test_acc
+            })
+
+    # Test Logistic Regression with different hyperparameters
+    for C in C_values:
+        for max_iter in max_iter_values:
+            # Logistic Regression with L2 regularization
+            clf = LogisticRegression(
+                C=C,
+                max_iter=max_iter,
+                penalty='l2',
+                solver='lbfgs',
+                random_state=random_state
+            )
+            clf.fit(X_train, y_train)
+            train_acc = clf.score(X_train, y_train)
+            test_acc = clf.score(X_test, y_test)
+            results.append({
+                'Dataset': dataset_name,
+                'Feature_Noise': feature_noise_str,
+                'Label_Noise': label_noise_str,
+                'Model': 'LogisticRegression-l2',
+                'k': None,
+                'weights': None,
+                'max_depth': None,
+                'min_samples_split': None,
+                'C': C,
+                'max_iter': max_iter,
+                'Train Acc': train_acc,
+                'Test Acc': test_acc
+            })
+
+            # Logistic Regression with L1 regularization
+            clf = LogisticRegression(
+                C=C,
+                max_iter=max_iter,
+                penalty='l1',
+                solver='liblinear',
+                random_state=random_state
+            )
+            clf.fit(X_train, y_train)
+            train_acc = clf.score(X_train, y_train)
+            test_acc = clf.score(X_test, y_test)
+            results.append({
+                'Dataset': dataset_name,
+                'Feature_Noise': feature_noise_str,
+                'Label_Noise': label_noise_str,
+                'Model': 'LogisticRegression-l1',
+                'k': None,
+                'weights': None,
+                'max_depth': None,
+                'min_samples_split': None,
+                'C': C,
+                'max_iter': max_iter,
+                'Train Acc': train_acc,
+                'Test Acc': test_acc
+            })
+
+    # Thread-safe counter increment and print
+    with lock:
+        counter.value += 1
+        completed = counter.value
+        remaining = total - completed
+        print(f"[{completed}/{total}] Completed: {dataset_name} | Feature: {feature_noise_str} | Label: {label_noise_str} | Remaining: {remaining}")
+    
+    return results
+
+
+def main():
+    """Run all experiments in parallel and save results to CSV"""
+    print("="*70)
+    print("BASELINE MODEL COMPARISON EXPERIMENTS (KNN, DECISION TREE & LOGISTIC REGRESSION)")
+    print("="*70)
+    print(f"\nDatasets: {list(datasets_config.keys())}")
+    print(f"Feature noise levels: {['Clean' if x is None else x for x in feature_noise_levels]}")
+    print(f"Label noise levels: {[f'{int(n*100)}%' for n in label_noise_levels]}")
+    print(f"Models: KNN (uniform & distance), Decision Tree (gini & entropy), Logistic Regression (l1 & l2)")
+    print(f"KNN k values: {k_values}")
+    print(f"Decision Tree max_depth values: {max_depth_values}")
+    print(f"Decision Tree min_samples_split values: {min_samples_split_values}")
+    print(f"Logistic Regression C values: {C_values}")
+    print(f"Logistic Regression max_iter values: {max_iter_values}")
+
+    # Calculate total experiments
+    num_knn = len(k_values) * 2  # uniform + distance weights
+    num_dt = len(max_depth_values) * len(min_samples_split_values) * 2  # gini + entropy
+    num_lr = len(C_values) * len(max_iter_values) * 2  # l1 + l2
+    total_per_noise_combo = num_knn + num_dt + num_lr
+    total_experiments = total_per_noise_combo * len(feature_noise_levels) * len(label_noise_levels) * len(datasets_config)
+
+    # Get number of CPUs
+    n_cpus = cpu_count()
+    print(f"\nTotal experiments: {total_experiments}")
+    print(f"CPUs available: {n_cpus}")
+    print(f"Using {n_cpus} parallel processes")
+    print("\nStarting experiments...\n")
+
+    # Prepare all experiment configurations
+    experiment_configs = []
+    for dataset_name in datasets_config.keys():
+        for feature_noise_level in feature_noise_levels:
+            for label_noise in label_noise_levels:
+                experiment_configs.append((dataset_name, feature_noise_level, label_noise, 42))
+
+    total_configs = len(experiment_configs)
+    print(f"Total configurations to process: {total_configs}\n")
+    
+    # Create shared counter and lock for progress tracking
+    manager = Manager()
+    counter = manager.Value('i', 0)
+    lock = manager.Lock()
+    
+    # Add counter and lock to each config
+    experiment_configs_with_counter = [
+        (config[0], config[1], config[2], config[3], total_configs, counter, lock) 
+        for config in experiment_configs
+    ]
+
+    # Run experiments in parallel
+    with Pool(processes=n_cpus) as pool:
+        all_results_list = pool.map(run_single_experiment, experiment_configs_with_counter)
+
+    # Flatten results list
+    all_results = []
+    for results in all_results_list:
+        all_results.extend(results)
+
+    # Convert to DataFrame
+    df_all_results = pd.DataFrame(all_results)
+
+    print(f"\n\n{'='*70}")
+    print(f"ALL EXPERIMENTS COMPLETED")
+    print(f"{'='*70}")
+    print(f"Total experiments: {len(df_all_results)}")
+    print(f"Datasets: {df_all_results['Dataset'].nunique()}")
+    print(f"Models: {df_all_results['Model'].nunique()}")
+    print(f"Feature noise levels: {df_all_results['Feature_Noise'].nunique()}")
+    print(f"Label noise levels: {df_all_results['Label_Noise'].nunique()}")
+
+    # Save results to CSV
+    output_filename = 'baseline_comparison_results.csv'
+    df_all_results.to_csv(output_filename, index=False)
+    print(f"\n✓ Results saved to {output_filename}")
+
+    # Display sample results
+    print(f"\nSample results:")
+    print(df_all_results.head(10))
+
+    # Display basic statistics
+    print(f"\n\nDataset statistics:")
+    print(df_all_results.groupby('Dataset').size())
+    print(f"\nModel statistics:")
+    print(df_all_results.groupby('Model').size())
+
+
+if __name__ == '__main__':
+    main()
