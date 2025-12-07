@@ -1,2 +1,9 @@
 *.pyc
 __pychache__/
+
+visualizations/comparison
+visualizations/noise_heatmap
+visualizations/noise_heatmap_selected
+visualizations/decision_boundary
+
+results/
